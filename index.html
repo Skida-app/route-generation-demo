@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="no">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rutevisning med Mapbox</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      mapboxgl.accessToken =
+        "pk.eyJ1Ijoic2tpZGEtYXBwIiwiYSI6ImNsczRmYm4wZDAzYjUya254c3gxOWFjcjEifQ.ZqRmHsdoHbshQpa6bU9uUQ";
+      const map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/skida-app/cm3dgd5td002001qx0mbf1hdp",
+        center: [19.1548485, 69.5778374],
+        zoom: 12,
+      });
+
+      let points = [];
+      let markers = [];
+      let routeLayerId = "route-layer";
+
+      map.on("click", async (e) => {
+        const lngLat = [e.lngLat.lng, e.lngLat.lat];
+
+        if (points.length === 2) {
+          points = [];
+          markers.forEach((m) => m.remove());
+          markers = [];
+          if (map.getLayer(routeLayerId)) {
+            map.removeLayer(routeLayerId);
+            map.removeSource(routeLayerId);
+          }
+        }
+
+        points.push(lngLat);
+        const marker = new mapboxgl.Marker().setLngLat(lngLat).addTo(map);
+        markers.push(marker);
+
+        if (points.length === 2) {
+          const [start, end] = points;
+
+          const body = {
+            input: {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                type: "LineString",
+                coordinates: [start, end],
+              },
+            },
+          };
+
+          console.log({ body });
+
+          const res = await fetch(
+            `https://skida-route-api-456581513626.europe-west3.run.app/api/v1/route-generation`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(body),
+            }
+          );
+
+          const data = await res.json();
+
+          map.addSource(routeLayerId, {
+            type: "geojson",
+            data: data.route,
+          });
+
+          map.addLayer({
+            id: routeLayerId,
+            type: "line",
+            source: routeLayerId,
+            layout: {
+              "line-join": "round",
+              "line-cap": "round",
+            },
+            paint: {
+              "line-color": "#007AFF",
+              "line-width": 4,
+            },
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
